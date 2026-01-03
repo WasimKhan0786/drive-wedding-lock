@@ -61,11 +61,6 @@ A premium, secure, and permanent video gallery designed for wedding memories. Th
     ```
     Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-## 🔐 Credentials (Default)
-
-- **Login Email**: `wasimkham7861@gmail.com`
-- **Password**: `wasim0786`
-
 ## ☁️ Deployment on Vercel
 
 1.  Push your code to **GitHub**.
