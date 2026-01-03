@@ -23,10 +23,6 @@ export async function loginAction(formData: FormData) {
 }
 
 export async function deleteVideoAction(publicId: string) {
-  // Security: Deletion is strictly disabled by policy.
-  return { success: false, error: "Video deletion is disabled." };
-  
-  /* 
   try {
     await deleteVideoResource(publicId);
     revalidatePath("/gallery"); 
@@ -36,7 +32,6 @@ export async function deleteVideoAction(publicId: string) {
     console.error("Failed to delete video:", error);
     return { success: false, error: "Failed to delete video" };
   }
-  */
 }
 
 export async function getUsageAction() {

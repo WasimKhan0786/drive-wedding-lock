@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect, useTransition } from "react";
-import { Play, X, ChevronLeft, ChevronRight, Pause, Volume2, VolumeX, Maximize, Download, Settings } from "lucide-react";
-// import { deleteVideoAction } from "@/app/actions"; // Delete functionality disabled by user request
+import { Play, X, ChevronLeft, ChevronRight, Pause, Volume2, VolumeX, Maximize, Download, Settings, Trash2, Loader2 } from "lucide-react";
+import { deleteVideoAction } from "@/app/actions";
 import { CldImage } from "next-cloudinary";
 
 interface VideoResource {
@@ -22,8 +22,8 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
   const [quality, setQuality] = useState<string>("auto");
   const [showQualityMenu, setShowQualityMenu] = useState(false);
   const [touchStart, setTouchStart] = useState<number | null>(null);
-  // const [videoToDelete, setVideoToDelete] = useState<string | null>(null);
-  // const [isDeleting, startTransition] = useTransition();
+  const [videoToDelete, setVideoToDelete] = useState<string | null>(null);
+  const [isDeleting, startTransition] = useTransition();
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -46,7 +46,22 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
     }
   };
   
-  /* Delete functionality removed */
+  const handleDeleteClick = (e: React.MouseEvent, publicId: string) => {
+      e.stopPropagation();
+      setVideoToDelete(publicId);
+  };
+
+  const confirmDelete = () => {
+      if (videoToDelete) {
+          startTransition(async () => {
+             const result = await deleteVideoAction(videoToDelete);
+             if (!result.success) {
+                 alert("Failed to delete video.");
+             }
+             setVideoToDelete(null);
+          });
+      }
+  };
 
   // Swipe Handlers
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -235,15 +250,128 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
                     {video.duration ? `${Math.floor(video.duration / 60)}:${Math.floor(video.duration % 60).toString().padStart(2, '0')}` : 'VIDEO'}
                  </div>
 
-                 {/* Delete Button Removed */}
+                 <button 
+                    onClick={(e) => handleDeleteClick(e, video.public_id)}
+                    disabled={isDeleting}
+                    className="delete-btn"
+                    style={{
+                        position: 'absolute',
+                        top: '10px',
+                        right: '10px',
+                        background: 'rgba(244, 66, 53, 0.8)',
+                        border: 'none',
+                        borderRadius: '50%',
+                        padding: '8px',
+                        cursor: 'pointer',
+                        color: '#fff',
+                        zIndex: 2,
+                        transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transform: videoToDelete === video.public_id ? 'scale(0)' : 'scale(1)'
+                    }}
+                 >
+                    <Trash2 size={16} />
+                 </button>
               </div>
             </div>
           ))}
       </div>
 
-      {/* Delete Styles Removed */}
+      <style jsx global>{`
+        .delete-btn:hover {
+            transform: scale(1.1) rotate(15deg) !important;
+            background: rgba(244, 66, 53, 1) !important;
+            box-shadow: 0 5px 15px rgba(244, 66, 53, 0.4);
+        }
+        @keyframes modalPop {
+            0% { transform: scale(0.9); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+      `}</style>
 
-      {/* Delete Modal Removed */}
+      {/* Custom Delete Confirmation Modal */}
+      {videoToDelete && (
+        <div style={{
+            position: 'fixed',
+            top: 0, left: 0, width: '100%', height: '100%',
+            background: 'rgba(0,0,0,0.6)',
+            zIndex: 2000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backdropFilter: 'blur(5px)'
+        }}
+        onClick={() => setVideoToDelete(null)}
+        >
+            <div 
+                onClick={(e) => e.stopPropagation()}
+                className="glass-panel"
+                style={{
+                    padding: '2rem',
+                    maxWidth: '400px',
+                    width: '90%',
+                    textAlign: 'center',
+                    animation: 'modalPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                    border: '1px solid rgba(244, 66, 53, 0.3)',
+                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
+                }}
+            >
+                <div style={{
+                    width: '60px', height: '60px',
+                    background: 'rgba(244, 66, 53, 0.1)',
+                    borderRadius: '50%',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    margin: '0 auto 1.5rem auto',
+                    color: '#f44336'
+                }}>
+                    <Trash2 size={32} />
+                </div>
+                <h3 style={{ fontSize: '1.5rem', marginBottom: '0.5rem', color: '#fff' }}>Delete Memory?</h3>
+                <p style={{ color: '#aaa', marginBottom: '2rem' }}>
+                    Are you sure you want to delete this video? This action cannot be undone.
+                </p>
+                <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+                    <button 
+                        onClick={() => setVideoToDelete(null)}
+                        style={{
+                            background: 'transparent',
+                            border: '1px solid #444',
+                            color: '#fff',
+                            padding: '0.75rem 1.5rem',
+                            borderRadius: '99px',
+                            cursor: 'pointer',
+                            fontSize: '0.9rem',
+                            transition: 'all 0.2s'
+                        }}
+                    >
+                        Cancel
+                    </button>
+                    <button 
+                        onClick={confirmDelete}
+                        disabled={isDeleting}
+                        style={{
+                            background: '#f44336',
+                            border: 'none',
+                            color: '#fff',
+                            padding: '0.75rem 1.5rem',
+                            borderRadius: '99px',
+                            cursor: 'pointer',
+                            fontSize: '0.9rem',
+                            fontWeight: 600,
+                            boxShadow: '0 4px 14px rgba(244, 66, 53, 0.4)',
+                            transition: 'all 0.2s',
+                            display: 'flex', alignItems: 'center', gap: '8px'
+                        }}
+                    >
+                        {isDeleting && <Loader2 size={16} className="animate-spin" />}
+                        {isDeleting ? 'Deleting...' : 'Yes, Delete'}
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
 
       {/* Custom Video Player Modal */}
       {selectedVideo && selectedVideoIndex !== null && (
