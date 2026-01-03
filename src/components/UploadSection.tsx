@@ -145,7 +145,7 @@ export default function UploadSection() {
               <div>
                 <h3 style={{ fontSize: '2rem', marginBottom: '0.5rem', fontWeight: 600 }}>Drop Wedding Videos Here</h3>
                 <p style={{ color: '#888', fontSize: '1.1rem' }}>Support for 4K (MP4, MOV, MKV)</p>
-                <p style={{ color: '#555', fontSize: '0.9rem', marginTop: '0.5rem' }}>Up to 50 GB per file</p>
+                <p style={{ color: '#555', fontSize: '0.9rem', marginTop: '0.5rem' }}>Max ~4 GB per file</p>
               </div>
               <button className="btn-primary" style={{ marginTop: '1rem' }}>
                 Select Video Files
