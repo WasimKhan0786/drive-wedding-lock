@@ -842,6 +842,7 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
              backdropFilter: 'blur(10px)'
          }}>
              <div 
+                 className="video-container"
                  style={{ position: 'relative', width: '90%', maxWidth: '1200px', aspectRatio: '16/9', background: '#000', borderRadius: '12px', boxShadow: '0 0 50px rgba(0,0,0,0.5)', overflow: 'hidden' }}
              >
                  {selectedVideo.format === 'youtube' && selectedVideo.youtubeId ? (
@@ -849,11 +850,10 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
                       <iframe 
                           width="100%" 
                           height="100%" 
-                          src={`https://www.youtube.com/embed/${selectedVideo.youtubeId}?autoplay=1&rel=0&modestbranding=1&controls=1&showinfo=0`} 
+                          src={`https://www.youtube.com/embed/${selectedVideo.youtubeId}?autoplay=1&rel=0&modestbranding=1&controls=1&showinfo=0&fs=0`} 
                           title="YouTube video player" 
                           frameBorder="0" 
                           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                          allowFullScreen
                           style={{ pointerEvents: 'auto' }}
                       ></iframe>
                       {/* Blocker to hide Share/Title from YouTube Player */}
@@ -866,6 +866,36 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
                           zIndex: 10,
                           background: 'transparent'
                       }} />
+                       
+                       {/* Custom Fullscreen Button */}
+                       <div style={{
+                           position: 'absolute',
+                           bottom: '1px',
+                           right: '10px',
+                           zIndex: 20
+                       }}>
+                         <button 
+                             onClick={() => {
+                                 const elem = document.querySelector('.video-container');
+                                 if (!elem) return;
+                                 if (!document.fullscreenElement) {
+                                     elem.requestFullscreen().catch(err => {
+                                         console.error(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+                                     });
+                                 } else {
+                                     document.exitFullscreen();
+                                 }
+                             }}
+                             style={{
+                                 background: 'transparent',
+                                 border: 'none',
+                                 cursor: 'pointer',
+                                 padding: '10px'
+                             }}
+                         >
+                             <Maximize size={24} color="rgba(255,255,255, 0.7)" />
+                         </button>
+                       </div>
                      </>
                  ) : (
                      <video 
