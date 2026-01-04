@@ -875,14 +875,27 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
                           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
                           style={{ pointerEvents: 'auto' }}
                       ></iframe>
-                      {/* Blocker to hide Share/Title from YouTube Player */}
+                      {/* Blocker to hide Share/Title/Watch Later from YouTube Player */}
                       <div style={{
                           position: 'absolute',
                           top: 0,
                           left: 0,
                           width: '100%',
-                          height: '80px', // Covers top bar
+                          height: '25%', // Increased to cover typical mobile UI top bar
+                          minHeight: '80px',
                           zIndex: 10,
+                          background: 'transparent', 
+                          // debug: 'rgba(255,0,0,0.2)' 
+                      }} />
+                      
+                      {/* Extra blocker for top-right "Watch Later" / "Share" specifically */}
+                      <div style={{
+                          position: 'absolute',
+                          top: 0,
+                          right: 0,
+                          width: '30%', // Cover the right side more aggressively
+                          height: '35%',
+                          zIndex: 11,
                           background: 'transparent'
                       }} />
                        
