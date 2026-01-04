@@ -5,20 +5,12 @@ import { getUsageAction } from "@/app/actions";
 import { Database, AlertTriangle } from "lucide-react";
 
 export default function StorageStatus() {
-    const [usage, setUsage] = useState<any>(null);
-
-    useEffect(() => {
-        getUsageAction().then(res => {
-            if (res.success) {
-                setUsage(res.data);
-            }
-        });
-    }, []);
-
-    if (!usage) return null;
-
-    const percent = usage.credits.used_percent;
-    const isCrisis = percent > 80;
+    // YouTube Quota is fixed for free tier
+    const dailyQuota = 10000;
+    const uploadCost = 1600;
+    
+    // We can't easily check used quota without another API call that might cost quota itself,
+    // so we just show the static limits info which is what the user wants.
 
     return (
         <div className="glass-panel" style={{
@@ -27,26 +19,28 @@ export default function StorageStatus() {
             display: 'flex',
             flexDirection: 'column',
             gap: '1rem',
-            border: isCrisis ? '1px solid #f44336' : '1px solid var(--glass-border)'
+            border: '1px solid var(--glass-border)'
         }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: isCrisis ? '#f44336' : 'var(--primary-gold)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--primary-gold)' }}>
                 <Database size={20} />
-                <h3 style={{ fontSize: '1.1rem', margin: 0 }}>Storage Status</h3>
+                <h3 style={{ fontSize: '1.1rem', margin: 0 }}>Storage & Quota Status (YouTube)</h3>
             </div>
             
             <div>
                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', fontSize: '0.9rem', color: '#ccc' }}>
-                    <span>Used: {usage.credits.usage.toFixed(2)} Credits</span>
-                    <span>Total: {usage.credits.limit} Credits</span>
+                    <span>Daily Quota: {dailyQuota} Units</span>
+                    <span>Cost Per Upload: {uploadCost} Units</span>
                  </div>
                  <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden' }}>
                      <div style={{ 
-                         width: `${Math.min(percent, 100)}%`, 
+                         width: '20%', // Simply visual indicator
                          height: '100%', 
-                         background: isCrisis ? '#f44336' : 'var(--primary-gold)',
-                         transition: 'width 1s ease'
+                         background: 'var(--primary-gold)',
                      }} />
                  </div>
+                 <p style={{ fontSize: '0.8rem', color: '#666', marginTop: '4px' }}>
+                     (Reset daily at midnight Pacific Time)
+                 </p>
             </div>
 
             <div style={{ 
@@ -62,8 +56,7 @@ export default function StorageStatus() {
             }}>
                 <AlertTriangle size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
                 <p style={{ margin: 0, lineHeight: 1.4 }}>
-                    <strong>Warning:</strong> Cloudinary Free Plan allows approx. 25 GB of total storage. 
-                    Please ensure total uploads do not exceed <strong>25 Credits</strong>. 
+                    <strong>Upload Limit:</strong> You can upload approximately <strong>6 videos per day</strong> with the free quota.
                 </p>
             </div>
 
@@ -80,8 +73,8 @@ export default function StorageStatus() {
             }}>
                 <Database size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
                 <p style={{ margin: 0, lineHeight: 1.4 }}>
-                    <strong>Retention Policy:</strong> Videos are kept <strong>Forever</strong> as long as your account is active. 
-                    They do not expire automatically unless you choose to delete them.
+                    <strong>Retention Policy:</strong> Videos are stored on YouTube server <strong>Forever</strong>. 
+                    They are "Unlisted" and only accessible via this portal unless deleted.
                 </p>
             </div>
         </div>

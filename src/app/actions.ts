@@ -24,7 +24,39 @@ export async function loginAction(formData: FormData) {
 
 export async function deleteVideoAction(publicId: string) {
   try {
-    await deleteVideoResource(publicId);
+      // Deleting from MongoDB
+      const { default: connectToDatabase } = await import("@/lib/db");
+      const { default: Video } = await import("@/models/Video");
+      const { default: DeletedVideo } = await import("@/models/DeletedVideo");
+
+      await connectToDatabase();
+      
+      // 1. Find the video first to blacklist it
+      const videoToDelete = await Video.findOne({ 
+        $or: [{ videoId: publicId }, { id: publicId }] 
+      });
+
+      if (videoToDelete && videoToDelete.youtubeId) {
+          // 2. Add to Blacklist
+          await DeletedVideo.findOneAndUpdate(
+              { youtubeId: videoToDelete.youtubeId },
+              { youtubeId: videoToDelete.youtubeId, deletedAt: new Date() },
+              { upsert: true, new: true }
+          );
+      }
+
+      // 3. Delete from Gallery
+      const result = await Video.deleteOne({ 
+          $or: [{ videoId: publicId }, { id: publicId }] 
+      });
+
+      if (result.deletedCount === 0) {
+           return { success: false, error: "Video not found in database" };
+      }
+
+      // NOTE: We are NOT deleting from YouTube because standard API quota is strict.
+      // We just remove the reference from our app so it doesn't show up.
+
     revalidatePath("/gallery"); 
     revalidatePath("/upload"); 
     return { success: true };
@@ -34,9 +66,60 @@ export async function deleteVideoAction(publicId: string) {
   }
 }
 
+export async function updateVideoPasswordAction(publicId: string, newPassword: string) {
+   try {
+       const { default: connectToDatabase } = await import("@/lib/db");
+       const { default: Video } = await import("@/models/Video");
+       
+       await connectToDatabase();
+       
+       const result = await Video.findOneAndUpdate(
+           { $or: [{ videoId: publicId }, { id: publicId }, { public_id: publicId }] },
+           { $set: { password: newPassword } },
+           { new: true }
+       );
+       
+       if (!result) {
+           return { success: false, error: "Video not found" };
+       }
+       
+       revalidatePath("/gallery");
+       return { success: true };
+   } catch (error) {
+       console.error("Failed to update password:", error);
+       return { success: false, error: "Failed to update password" };
+   }
+}
+
+export async function toggleVideoVisibilityAction(publicId: string, hidden: boolean) {
+   try {
+       const { default: connectToDatabase } = await import("@/lib/db");
+       const { default: Video } = await import("@/models/Video");
+       
+       await connectToDatabase();
+       
+       const result = await Video.findOneAndUpdate(
+           { $or: [{ videoId: publicId }, { id: publicId }, { public_id: publicId }] },
+           { $set: { hidden: hidden } },
+           { new: true }
+       );
+       
+       if (!result) {
+           return { success: false, error: "Video not found" };
+       }
+       
+       revalidatePath("/gallery");
+       return { success: true };
+   } catch (error) {
+       console.error("Failed to toggle visibility:", error);
+       return { success: false, error: "Failed to toggle visibility" };
+   }
+}
+
 export async function getUsageAction() {
     try {
-        const usage = await getCloudinaryUsage();
+        const { getDropboxUsage } = await import("@/lib/dropbox");
+        const usage = await getDropboxUsage();
         return { success: true, data: usage };
     } catch (error) {
         return { success: false, error: "Failed to fetch usage" };
