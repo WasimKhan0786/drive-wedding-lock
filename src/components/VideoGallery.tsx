@@ -52,8 +52,7 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
   const [isUnlocked, setIsUnlockedFn] = useState(false); 
   
   // Payment State
-  const [isPurchaseModalOpen, setPurchaseModalOpen] = useState(false);
-  const [purchaseModalOpen, setPurchaseModalOpenState] = useState(false); // Alias to fix existing usage
+  const [purchaseModalOpen, setPurchaseModalOpen] = useState(false);
   const [processingProvider, setProcessingProvider] = useState<'razorpay' | 'phonepe' | null>(null);
   const [purchaseType, setPurchaseType] = useState<'download' | 'share'>('download');
   
