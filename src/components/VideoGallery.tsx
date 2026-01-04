@@ -746,9 +746,13 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
                    <div style={{ margin: '0 auto 1.5rem', width: '70px', height: '70px', background: 'rgba(251, 191, 36, 0.1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fbbf24' }}>
                        <CreditCard size={32} />
                    </div>
-                   <h3 style={{ fontSize: '1.8rem', marginBottom: '0.5rem', fontFamily: 'var(--font-heading)', color: '#fff' }}>Unlock Download</h3>
+                   <h3 style={{ fontSize: '1.8rem', marginBottom: '0.5rem', fontFamily: 'var(--font-heading)', color: '#fff' }}>
+                       {purchaseType === 'share' ? 'Unlock Share' : 'Unlock Download'}
+                   </h3>
                    <p style={{ color: '#aaa', marginBottom: '2rem' }}>
-                       To download this premium memory in 4K resolution, a small fee is required.
+                       {purchaseType === 'share' 
+                           ? "To share this premium memory with friends and family, a small fee is required." 
+                           : "To download this premium memory in 4K resolution, a small fee is required."}
                    </p>
                    
                    <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '12px', marginBottom: '2rem' }}>
