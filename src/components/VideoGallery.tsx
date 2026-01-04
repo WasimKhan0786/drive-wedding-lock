@@ -84,6 +84,22 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
     }
   }, [toastMessage]);
   
+  // Deep Linking Check
+  useEffect(() => {
+     if (typeof window === "undefined") return;
+     const params = new URLSearchParams(window.location.search);
+     const videoParam = params.get('video');
+     if (videoParam) {
+         const index = videos.findIndex(v => v.public_id === videoParam);
+         if (index !== -1) {
+             setSelectedVideoIndex(index);
+             // Clear param to keep URL clean? Maybe keep it for refresh persistence?
+             // Let's keep it clean or else back button gets weird.
+             // window.history.replaceState({}, '', window.location.pathname);
+         }
+     }
+  }, [videos]);
+
   // Payment Validation (PhonePe Redirect)
   useEffect(() => {
       if (typeof window === "undefined") return;
@@ -117,8 +133,9 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
                      // Action based on type
                      if (pendingType === 'share') {
                          showNotification('success', "Payment Successful! Link is ready to share.");
-                         if (vid.format === 'youtube') copyToClipboard(`https://www.youtube.com/watch?v=${vid.youtubeId}`);
-                         else copyToClipboard(vid.secure_url);
+                         // Generate Portal Link instead of Raw Source Link
+                         const portalLink = `${window.location.origin}${window.location.pathname}?video=${vid.public_id}`;
+                         copyToClipboard(portalLink);
                      } else {
                          // Default to download
                          if (vid.format === 'youtube') {
@@ -1005,8 +1022,9 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
                  onClick={(e) => { 
                     e.stopPropagation(); 
                     if (isAdminMode) {
-                         if (selectedVideo.format === 'youtube') copyToClipboard(`https://www.youtube.com/watch?v=${selectedVideo.youtubeId}`);
-                         else copyToClipboard(selectedVideo.secure_url);
+                         const portalLink = `${window.location.origin}${window.location.pathname}?video=${selectedVideo.public_id}`;
+                         copyToClipboard(portalLink);
+                         showNotification('success', "Portal Link Copied!");
                     } else {
                         setPurchaseType('share'); // Set type
                         setPurchaseModalOpen(true);
