@@ -845,15 +845,28 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
                  style={{ position: 'relative', width: '90%', maxWidth: '1200px', aspectRatio: '16/9', background: '#000', borderRadius: '12px', boxShadow: '0 0 50px rgba(0,0,0,0.5)', overflow: 'hidden' }}
              >
                  {selectedVideo.format === 'youtube' && selectedVideo.youtubeId ? (
-                     <iframe 
-                         width="100%" 
-                         height="100%" 
-                         src={`https://www.youtube.com/embed/${selectedVideo.youtubeId}?autoplay=1&rel=0&modestbranding=1`} 
-                         title="YouTube video player" 
-                         frameBorder="0" 
-                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
-                         allowFullScreen
-                     ></iframe>
+                     <>
+                      <iframe 
+                          width="100%" 
+                          height="100%" 
+                          src={`https://www.youtube.com/embed/${selectedVideo.youtubeId}?autoplay=1&rel=0&modestbranding=1&controls=1&showinfo=0`} 
+                          title="YouTube video player" 
+                          frameBorder="0" 
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                          allowFullScreen
+                          style={{ pointerEvents: 'auto' }}
+                      ></iframe>
+                      {/* Blocker to hide Share/Title from YouTube Player */}
+                      <div style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          height: '80px', // Covers top bar
+                          zIndex: 10,
+                          background: 'transparent'
+                      }} />
+                     </>
                  ) : (
                      <video 
                          src={selectedVideo.secure_url}
