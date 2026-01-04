@@ -39,7 +39,7 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
 
   // CONSTANTS
   const ADMIN_CODE = "7004636112";
-  const DOWNLOAD_PRICE = 49;
+  const DOWNLOAD_PRICE = 200;
   const SHARE_PRICE = 100;
   
   // Admin Mode State
@@ -101,7 +101,7 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
                      // Trigger Email
                      if (pendingCustomer) {
                         const customer = JSON.parse(pendingCustomer);
-                        const amountPaid = pendingType === 'share' ? 100 : 49;
+                        const amountPaid = pendingType === 'share' ? SHARE_PRICE : DOWNLOAD_PRICE;
                         fetch('/api/send-email', {
                             method: 'POST',
                             body: JSON.stringify({
