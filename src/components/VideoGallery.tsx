@@ -28,29 +28,36 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
   const [isDeleting, startTransition] = useTransition();
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Purchase Logic
-  const [purchaseModalOpen, setPurchaseModalOpen] = useState(false);
-  const [processingProvider, setProcessingProvider] = useState<'razorpay' | 'phonepe' | null>(null);
-
   // Password Logic
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [passwordInput, setPasswordInput] = useState("");
   const [passwordError, setPasswordError] = useState(false);
-  const [isUnlocked, setIsUnlockedFn] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   // Toast State
   const [toastMessage, setToastMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
 
-  // Master Password Removed
+  // CONSTANTS
   const ADMIN_CODE = "7004636112";
-
+  const DOWNLOAD_PRICE = 49;
+  const SHARE_PRICE = 100;
+  
   // Admin Mode State
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [isUpdatingPassword, startPasswordTransition] = useTransition();
 
+  // Selected Video State
+  const [isUnlocked, setIsUnlockedFn] = useState(false); 
+  
+  // Payment State
+  const [isPurchaseModalOpen, setPurchaseModalOpen] = useState(false);
+  const [purchaseModalOpen, setPurchaseModalOpenState] = useState(false); // Alias to fix existing usage
+  const [processingProvider, setProcessingProvider] = useState<'razorpay' | 'phonepe' | null>(null);
+  const [purchaseType, setPurchaseType] = useState<'download' | 'share'>('download');
+  
+  
   const selectedVideo = selectedVideoIndex !== null ? videos[selectedVideoIndex] : null;
 
   useEffect(() => {
@@ -87,6 +94,7 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
            
            const pendingId = localStorage.getItem('pendingDownloadId');
            const pendingCustomer = localStorage.getItem('pendingCustomer');
+           const pendingType = localStorage.getItem('pendingPurchaseType') || 'download';
            
            if (pendingId) {
                 const vid = videos.find(v => v.public_id === pendingId);
@@ -94,34 +102,45 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
                      // Trigger Email
                      if (pendingCustomer) {
                         const customer = JSON.parse(pendingCustomer);
+                        const amountPaid = pendingType === 'share' ? 100 : 49;
                         fetch('/api/send-email', {
                             method: 'POST',
                             body: JSON.stringify({
                                 email: customer.email,
                                 name: customer.name,
                                 videoTitle: vid.title || 'Memory',
-                                amount: 400,
-                                paymentId: 'PhonePe-Redirect',
-                                provider: 'PhonePe'
+                                amount: amountPaid,
+                                type: pendingType
                             })
                         });
                      }
 
-                     if (vid.format === 'youtube') {
-                        window.open(`https://www.youtube.com/watch?v=${vid.youtubeId}`, '_blank');
+                     // Action based on type
+                     if (pendingType === 'share') {
+                         showNotification('success', "Payment Successful! Link is ready to share.");
+                         if (vid.format === 'youtube') copyToClipboard(`https://www.youtube.com/watch?v=${vid.youtubeId}`);
+                         else copyToClipboard(vid.secure_url);
                      } else {
-                         const link = document.createElement('a');
-                         link.href = vid.secure_url;
-                         link.download = (vid.title || 'memory') + ".mp4";
-                         document.body.appendChild(link);
-                         link.click();
-                         document.body.removeChild(link);
+                         // Default to download
+                         if (vid.format === 'youtube') {
+                            window.open(`https://www.youtube.com/watch?v=${vid.youtubeId}`, '_blank');
+                         } else {
+                             const link = document.createElement('a');
+                             link.href = vid.secure_url;
+                             link.download = (vid.title || 'memory') + ".mp4";
+                             document.body.appendChild(link);
+                             link.click();
+                             document.body.removeChild(link);
+                         }
                      }
                 }
+                // Cleanup
                 localStorage.removeItem('pendingDownloadId');
                 localStorage.removeItem('pendingCustomer');
+                localStorage.removeItem('pendingPurchaseType');
            }
-           router.replace('/gallery');
+           // Clean URL
+           window.history.replaceState({}, '', window.location.pathname);
       }
   }, [videos, router]);
 
@@ -717,8 +736,8 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
                    </p>
                    
                    <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '12px', marginBottom: '2rem' }}>
-                       <p style={{ margin: 0, fontSize: '2rem', fontWeight: 'bold', color: 'var(--primary-gold)' }}>₹400</p>
-                       <p style={{ margin: 0, fontSize: '0.9rem', color: '#666' }}>One-time payment</p>
+                       <p style={{ margin: 0, fontSize: '2rem', fontWeight: 'bold', color: 'var(--primary-gold)' }}>₹{purchaseType === 'share' ? SHARE_PRICE : DOWNLOAD_PRICE}</p>
+                       <p style={{ margin: 0, fontSize: '0.9rem', color: '#666' }}>One-time payment to {purchaseType === 'share' ? 'Share Link' : 'Download Video'}</p>
                    </div>
                    
                    <div style={{ marginBottom: '1.5rem', textAlign: 'left' }}>
@@ -941,25 +960,65 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
              </button>
 
               <button 
-                 onClick={(e) => { e.stopPropagation(); initiatePurchase(); }}
+                 onClick={(e) => { 
+                    e.stopPropagation(); 
+                    if (isAdminMode) {
+                        triggerDownload(); 
+                    } else {
+                        setPurchaseType('download'); // Set type
+                        setPurchaseModalOpen(true);
+                    }
+                 }}
                  style={{
                      position: 'absolute',
                      top: '20px',
                      right: '80px', // Next to Close button
-                     background: 'rgba(212, 175, 55, 0.2)',
-                     border: '1px solid var(--primary-gold)',
+                     background: isAdminMode ? 'rgba(59, 130, 246, 0.4)' : 'rgba(212, 175, 55, 0.2)',
+                     border: isAdminMode ? '1px solid #3b82f6' : '1px solid var(--primary-gold)',
                      borderRadius: '50%',
                      padding: '12px',
                      cursor: 'pointer',
-                     color: 'var(--primary-gold)',
+                     color: isAdminMode ? '#fff' : 'var(--primary-gold)',
                      zIndex: 2000,
                      backdropFilter: 'blur(5px)',
                      display: 'flex', alignItems: 'center', justifyContent: 'center'
                  }}
-                 title="Download (Purchase required)"
+                 title={isAdminMode ? "Admin Download" : "Download (Purchase required)"}
              >
                  <Download size={24} />
              </button>
+             
+             {/* Share Button (Paid Feature for Non-Admins) */}
+             <button 
+                 onClick={(e) => { 
+                    e.stopPropagation(); 
+                    if (isAdminMode) {
+                         if (selectedVideo.format === 'youtube') copyToClipboard(`https://www.youtube.com/watch?v=${selectedVideo.youtubeId}`);
+                         else copyToClipboard(selectedVideo.secure_url);
+                    } else {
+                        setPurchaseType('share'); // Set type
+                        setPurchaseModalOpen(true);
+                    }
+                 }}
+                 style={{
+                     position: 'absolute',
+                     top: '20px',
+                     right: '140px', // Next to Download button
+                     background: 'rgba(168, 85, 247, 0.2)',
+                     border: '1px solid #a855f7',
+                     borderRadius: '50%',
+                     padding: '12px',
+                     cursor: 'pointer',
+                     color: '#a855f7',
+                     zIndex: 2000,
+                     backdropFilter: 'blur(5px)',
+                     display: 'flex', alignItems: 'center', justifyContent: 'center'
+                 }}
+                 title="Share Video (Purchase required)"
+             >
+                 <Share2 size={24} />
+             </button>
+
          {isAdminMode && (
               <div style={{
                   position: 'absolute',
@@ -970,27 +1029,6 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
                   zIndex: 2000,
                   flexWrap: 'wrap'
               }}>
-                   <button 
-                      onClick={(e) => { 
-                          e.stopPropagation(); 
-                          if (selectedVideo.format === 'youtube') copyToClipboard(`https://www.youtube.com/watch?v=${selectedVideo.youtubeId}`);
-                          else copyToClipboard(selectedVideo.secure_url);
-                          showNotification('success', "Link Copied!");
-                      }}
-                      className="glass-panel"
-                      style={{
-                          background: 'rgba(255, 255, 255, 0.2)',
-                          border: '1px solid #fff',
-                          borderRadius: '8px',
-                          padding: '10px 15px',
-                          color: '#fff',
-                          display: 'flex', alignItems: 'center', gap: '8px',
-                          cursor: 'pointer'
-                      }}
-                   >
-                       <Share2 size={18} />
-                       Link
-                   </button>
                    <button 
                       onClick={(e) => { e.stopPropagation(); setIsChangePasswordModalOpen(true); }}
                       className="glass-panel"
