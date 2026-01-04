@@ -534,17 +534,17 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
            gap: '1.5rem',
            padding: '0 1rem'
         }}>
-           <style jsx>{`
+           <style dangerouslySetInnerHTML={{__html: `
                @media (max-width: 640px) {
                    .gallery-card {
                        min-height: auto;
                    }
-                   div[style*="display: grid"] {
+                   .animate-fade-in[style*="display: grid"] {
                        grid-template-columns: 1fr !important;
                        gap: 1.5rem !important;
                    }
                }
-           `}</style>
+           `}} />
            {visibleVideos.map((video, index) => (
              <div 
                key={video.public_id} 
