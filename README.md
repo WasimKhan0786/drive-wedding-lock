@@ -1,73 +1,81 @@
-# Forever & Always - Wedding Video Portal
+# Wedding Video Portal
 
-A premium, secure, and permanent video gallery designed for wedding memories. This portal allows guests and family to upload and watch wedding videos in high quality (4K) with a lifetime retention guarantee.
+A secure, premium platform for hosting and sharing high-quality wedding memories. This application allows authorized guests to view protected videos and purchase high-resolution downloads.
 
-## 🌟 Key Features
+## ✨ Features
 
-- **Premium Aesthetic**: Gold and Black glassmorphism design with smooth animations.
-- **Secure Access**: Protected by a 2-step login system (Email & Password).
-- **Lifetime Storage**: Videos are stored permanently on Cloudinary and never deleted.
-- **4K Support**: Upload high-quality videos (up to 50GB per file) with auto-transcoding.
-- **Adaptive Streaming**: Auto-quality selection (Auto, 4K, 1080p, 720p, 360p) for smooth playback on any device.
-- **Progressive Web App**: Fast loading with a "Heart" splash screen and optimized performance.
-- **Strict Security**:
-  - **No Delete Option**: Deletion is disabled in both UI and Server to prevent accidents.
-  - **Authenticated Access**: Login required to view or upload content.
+### 🔒 Secure Access
 
-## 🛠 Tech Stack
+- **Password Protection:** Every video is protected by a unique password.
+- **Admin Controls:** Hidden administration features for managing content securely.
+- **Privacy First:** Videos are hidden by default unless unlocked.
 
-- **Framework**: [Next.js 15](https://nextjs.org/) (App Router, Server Actions)
-- **Styling**: Vanilla CSS (Animation-heavy, Responsive) using CSS Modules/Global Styles.
-- **Storage & CDN**: [Cloudinary](https://cloudinary.com/) (Video API)
-- **Icons**: Lucide React
-- **Deployment**: Vercel Ready
+### 🎥 Premium Viewing Experience
 
-## 🚀 Getting Started
+- **High-Quality Playback:** seamless streaming of HD wedding moments.
+- **Mobile Responsive:** Optimized layout for phones, tablets, and desktops.
+- **Interactive Gallery:** Beautiful grid layout with glassmorphism UI design.
 
-### Prerequisites
+### 💳 Integrated Payments
 
-- Node.js 18+ installed.
-- A Cloudinary account (Free tier works great).
+- **PhonePe Integration:** Seamless UPI payments for users in India.
+- **Razorpay Support:** Robust alternative payment gateway for cards and net banking.
+- **Instant Delivery:** Download links are automatically generated upon successful payment.
 
-### Installation
+### 🛠 Admin Features (Hidden)
 
-1.  **Clone the repository:**
+- **Content Management:** Hide/Unhide videos instantly.
+- **Security Management:** Update video passwords on the fly.
+- **Video Deletion:** Remove content directly from the interface.
+- **Bypass:** Direct download access for administrators without payment.
+
+## � Technology Stack
+
+- **Framework:** [Next.js 14](https://nextjs.org/) (App Router)
+- **Language:** TypeScript
+- **Database:** MongoDB (via Mongoose)
+- **Styling:** Tailwind CSS + Custom Animations
+- **Payments:** PhonePe API & Razorpay SDK
+- **Storage:** Cloudinary / YouTube Embeds
+
+## 📦 Installation
+
+1.  Clone the repository:
 
     ```bash
-    git clone https://github.com/Start-Wasim/video-portal.git
-    cd video-portal
+    git clone https://github.com/WasimKh86/drive-wedding-lock.git
     ```
 
-2.  **Install dependencies:**
+2.  Install dependencies:
 
     ```bash
     npm install
     ```
 
-3.  **Setup Environment Variables:**
-    Create a `.env.local` file in the root directory and add your Cloudinary credentials (see `env_example.txt`):
+3.  Set up Environment Variables (`.env.local`):
 
     ```env
-    NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=your_cloud_name
-    NEXT_PUBLIC_CLOUDINARY_API_KEY=your_api_key
-    CLOUDINARY_API_SECRET=your_api_secret
-    CLOUDINARY_URL=cloudinary://...
-    NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=ml_default
+    MONGODB_URI=your_mongodb_connection_string
+    NEXT_PUBLIC_RAZORPAY_KEY_ID=your_razorpay_key_id
+    PHONEPE_CLIENT_ID=your_phonepe_client_id
+    PHONEPE_CLIENT_SECRET=your_phonepe_secret
+    EMAIL_USER=your_email_for_notifications
     ```
 
-4.  **Run Locally:**
+4.  Run the development server:
+
     ```bash
     npm run dev
     ```
-    Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-## ☁️ Deployment on Vercel
+5.  Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-1.  Push your code to **GitHub**.
-2.  Import the project on **Vercel**.
-3.  Add the **Environment Variables** (from step 3 above) in Vercel Project Settings.
-4.  Click **Deploy**.
+## 📝 Usage
+
+- **For Guests:** Click on any video card and enter the password provided to you to unlock and watch.
+- **To Download:** Click the 'Download' button on any video. A small fee is required to support the platform hosting.
+- **For Admins:** Use your specialized access code to manage the gallery directly from the frontend.
 
 ---
 
-_Developed with ❤️ for timeless memories._
+_Built with ❤️ for preserving beautiful memories._
