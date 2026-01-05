@@ -64,9 +64,10 @@ export async function POST() {
 
         for (const video of detailedVideos) {
             // SKIP if video is in blacklist
-            if (video.id && blacklistedIds.has(video.id)) {
+            // SKIP if video is in blacklist (DISABLED to allow recovery via Sync)
+            /* if (video.id && blacklistedIds.has(video.id)) {
                 continue;
-            }
+            } */
 
             const privacyStatus = video.status?.privacyStatus;
             

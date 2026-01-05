@@ -38,12 +38,14 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
   const [toastMessage, setToastMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
 
   // CONSTANTS
-  const ADMIN_CODE = "7004636112";
+  const ADMIN_AUTHOR_CODE = "7004636112";
+  const ADMIN_REGULAR_CODE = "admin";
   const DOWNLOAD_PRICE = 200;
   const SHARE_PRICE = 100;
   
   // Admin Mode State
-  const [isAdminMode, setIsAdminMode] = useState(false);
+  const [adminRole, setAdminRole] = useState<'none' | 'admin' | 'author'>('none');
+  const isAdminMode = adminRole !== 'none';
   const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [isUpdatingPassword, startPasswordTransition] = useTransition();
@@ -63,7 +65,7 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
      if (selectedVideo) {
          // Reset state and Require Password for ALL videos
          setIsUnlockedFn(false);
-         setIsAdminMode(false); // Reset Admin Mode
+         setAdminRole('none'); // Reset Admin Mode
          setPasswordInput("");
          setPasswordError(false);
          setIsPasswordModalOpen(true);
@@ -326,12 +328,22 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
       e.preventDefault();
       
       // Admin Check
-      if (passwordInput === ADMIN_CODE) {
+      if (passwordInput === ADMIN_AUTHOR_CODE) {
           setIsUnlockedFn(true);
-          setIsAdminMode(true);
+          setAdminRole('author');
           setIsPasswordModalOpen(false);
           setIsPlaying(true);
-          showNotification('success', "Admin Mode Activated");
+          showNotification('success', "Author Admin Mode Activated");
+          setPasswordError(false);
+          return;
+      }
+      
+      if (passwordInput === ADMIN_REGULAR_CODE) {
+          setIsUnlockedFn(true);
+          setAdminRole('admin');
+          setIsPasswordModalOpen(false);
+          setIsPlaying(true);
+          showNotification('success', "Admin Sync Mode Activated");
           setPasswordError(false);
           return;
       }
@@ -420,7 +432,34 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
       setTouchStart(null);
   };
 
-  const SyncButton = () => (
+  const SyncButton = () => {
+      // If NOT admin, show Login Button
+      if (!isAdminMode) {
+          return (
+              <button 
+                  onClick={() => { setSelectedVideoIndex(null); setIsPasswordModalOpen(true); }}
+                  className="glass-panel"
+                  style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '8px', 
+                      padding: '0.6rem 1.2rem', 
+                      color: 'var(--primary-gold)',
+                      border: '1px solid var(--glass-border)',
+                      cursor: 'pointer',
+                      borderRadius: '8px',
+                      background: 'rgba(0,0,0,0.5)',
+                      transition: 'all 0.2s',
+                      backdropFilter: 'blur(10px)'
+                  }}
+              >
+                  <Lock size={16} fill="var(--primary-gold)" />
+                  <span className="hidden sm:inline">Admin</span>
+              </button>
+          );
+      }
+
+      return (
       <button 
           onClick={handleSync}
           disabled={isSyncing}
@@ -435,7 +474,8 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
               cursor: 'pointer',
               borderRadius: '8px',
               background: 'rgba(0,0,0,0.3)',
-              transition: 'all 0.2s'
+              transition: 'all 0.2s',
+              backdropFilter: 'blur(10px)'
           }}
       >
            {isSyncing ? (
@@ -446,6 +486,7 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
           {isSyncing ? "Syncing..." : "Sync your memories!"}
       </button>
   );
+  };
 
   if (videos.length === 0) {
       return (
@@ -523,7 +564,12 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
    
    return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+      <div style={{ 
+          position: 'fixed',
+          top: '28px',
+          right: '25px', 
+          zIndex: 3000
+      }}>
           <SyncButton />
       </div>
 
@@ -686,6 +732,36 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
         @keyframes slideIn {
             from { transform: translateX(100%); opacity: 0; }
             to { transform: translateX(0); opacity: 1; }
+        }
+        
+        .admin-controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            display: flex;
+            gap: 15px;
+            z-index: 2000;
+            flex-wrap: wrap;
+        }
+        
+        @media (max-width: 768px) {
+            .admin-controls {
+                top: auto;
+                bottom: 90px;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 100%;
+                justify-content: center;
+                gap: 8px;
+            }
+            .admin-controls button {
+                font-size: 0.75rem !important;
+                padding: 8px 10px !important;
+            }
+            .admin-controls svg {
+                width: 14px !important;
+                height: 14px !important;
+            }
         }
        `}</style>
        
@@ -1054,15 +1130,7 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
              </button>
 
          {isAdminMode && (
-              <div style={{
-                  position: 'absolute',
-                  top: '20px',
-                  left: '20px',
-                  display: 'flex',
-                  gap: '15px',
-                  zIndex: 2000,
-                  flexWrap: 'wrap'
-              }}>
+               <div className="admin-controls">
                    <button 
                       onClick={(e) => { e.stopPropagation(); setIsChangePasswordModalOpen(true); }}
                       className="glass-panel"
@@ -1080,22 +1148,24 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
                        Change Password
                    </button>
                    
-                   <button 
-                      onClick={(e) => { e.stopPropagation(); handleDeleteClick(e, selectedVideo.public_id); confirmDelete(); }}
-                      className="glass-panel"
-                      style={{
-                          background: 'rgba(239, 68, 68, 0.2)',
-                          border: '1px solid #ef4444',
-                          borderRadius: '8px',
-                          padding: '10px 15px',
-                          color: '#ef4444',
-                          display: 'flex', alignItems: 'center', gap: '8px',
-                          cursor: 'pointer'
-                      }}
-                   >
-                       <Trash2 size={18} />
-                       Delete Video
-                   </button>
+                   {adminRole === 'author' && (
+                    <button 
+                       onClick={(e) => { e.stopPropagation(); handleDeleteClick(e, selectedVideo.public_id); confirmDelete(); }}
+                       className="glass-panel"
+                       style={{
+                           background: 'rgba(239, 68, 68, 0.2)',
+                           border: '1px solid #ef4444',
+                           borderRadius: '8px',
+                           padding: '10px 15px',
+                           color: '#ef4444',
+                           display: 'flex', alignItems: 'center', gap: '8px',
+                           cursor: 'pointer'
+                       }}
+                    >
+                        <Trash2 size={18} />
+                        Delete Video
+                    </button>
+                   )}
                    
                    <button 
                       onClick={async (e) => { 
