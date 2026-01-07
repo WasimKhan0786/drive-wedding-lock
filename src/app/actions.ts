@@ -125,3 +125,102 @@ export async function getUsageAction() {
         return { success: false, error: "Failed to fetch usage" };
     }
 }
+
+export async function createFolderAction(name: string, password: string) {
+    try {
+        const { default: connectToDatabase } = await import("@/lib/db");
+        const { default: Folder } = await import("@/models/Folder");
+        await connectToDatabase();
+        
+        await Folder.create({ name, password });
+        revalidatePath("/gallery");
+        return { success: true };
+    } catch (error) {
+        console.error("Failed to create folder:", error);
+        return { success: false, error: "Failed to create folder" };
+    }
+}
+
+export async function moveVideoToFolderAction(publicId: string, folderId: string | null) {
+    try {
+        const { default: connectToDatabase } = await import("@/lib/db");
+        const { default: Video } = await import("@/models/Video");
+        await connectToDatabase();
+        
+        const updateData: any = { folderId: folderId };
+        if (folderId) {
+            updateData.password = ""; // Remove password if moving to a folder
+            updateData.hidden = false; // Optional: Unhide if hidden?
+        }
+
+        const result = await Video.findOneAndUpdate(
+            { $or: [{ videoId: publicId }, { id: publicId }, { public_id: publicId }] },
+            { $set: updateData },
+            { new: true }
+        );
+        
+        if (!result) return { success: false, error: "Video not found" };
+        
+        revalidatePath("/gallery");
+        return { success: true };
+    } catch (error) {
+        console.error("Failed to move video:", error);
+        return { success: false, error: "Failed to move video" };
+    }
+}
+
+export async function renameFolderAction(folderId: string, newName: string) {
+    try {
+        const { default: connectToDatabase } = await import("@/lib/db");
+        const { default: Folder } = await import("@/models/Folder");
+        await connectToDatabase();
+        
+        await Folder.findByIdAndUpdate(folderId, { name: newName });
+        revalidatePath("/gallery");
+        return { success: true };
+    } catch (error) {
+        console.error("Failed to rename folder:", error);
+        return { success: false, error: "Failed to rename folder" };
+    }
+}
+
+export async function updateFolderPasswordAction(folderId: string, newPassword: string) {
+    try {
+        const { default: connectToDatabase } = await import("@/lib/db");
+        const { default: Folder } = await import("@/models/Folder");
+        await connectToDatabase();
+        
+        await Folder.findByIdAndUpdate(folderId, { password: newPassword });
+        revalidatePath("/gallery");
+        return { success: true };
+    } catch (error) {
+        console.error("Failed to update folder password:", error);
+        return { success: false, error: "Failed to update folder password" };
+    }
+}
+
+export async function deleteFolderAction(folderId: string) {
+    try {
+        const { default: connectToDatabase } = await import("@/lib/db");
+        const { default: Folder } = await import("@/models/Folder");
+        const { default: Video } = await import("@/models/Video");
+        await connectToDatabase();
+        
+        // Move videos inside this folder to root (maintain data safety)
+        await Video.updateMany({ folderId: folderId }, { $set: { folderId: null } });
+        
+        await Folder.findByIdAndDelete(folderId);
+        revalidatePath("/gallery");
+        return { success: true };
+    } catch (error) {
+        console.error("Failed to delete folder:", error);
+        return { success: false, error: "Failed to delete folder" };
+    }
+}
+
+export async function logoutAction() {
+    const cookieStore = await cookies();
+    cookieStore.delete("auth_token");
+    revalidatePath("/");
+    return { success: true };
+}

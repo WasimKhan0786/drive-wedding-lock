@@ -20,25 +20,15 @@ export default function Navbar() {
       borderRadius: '50px'
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <Heart className="text-gold" size={24} fill="currentColor" />
-        <span style={{ fontSize: '1.25rem', fontWeight: 600, fontFamily: 'var(--font-heading)' }}>
+        <Heart className="text-gold heart-beat" size={24} fill="currentColor" />
+        <span className="animated-logo-text" style={{ fontSize: '1.25rem', fontWeight: 600, fontFamily: 'var(--font-heading)' }}>
           Forever<span className="text-gold">&</span>Always
         </span>
       </div>
       
       <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
-        <Link href="/" style={{ textDecoration: 'none', color: 'inherit', fontWeight: 500 }}>
-          Home
-        </Link>
-        <Link href="/gallery" style={{ textDecoration: 'none', color: 'inherit', fontWeight: 500 }}>
-          Gallery
-        </Link>
-        <Link href="/upload">
-          <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Camera size={18} />
-            <span>Upload Memory</span>
-          </button>
-        </Link>
+
+
       </div>
     </nav>
   );

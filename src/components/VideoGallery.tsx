@@ -2,9 +2,9 @@
 
 import { useState, useRef, useEffect, useTransition } from "react";
 import { useRouter } from 'next/navigation';
-import { deleteVideoAction, updateVideoPasswordAction, toggleVideoVisibilityAction } from "@/app/actions";
+import { deleteVideoAction, updateVideoPasswordAction, toggleVideoVisibilityAction, createFolderAction, moveVideoToFolderAction, renameFolderAction, updateFolderPasswordAction, logoutAction, deleteFolderAction } from "@/app/actions";
 import { loadScript } from "@/lib/utils";
-import { Play, X, ChevronLeft, ChevronRight, Pause, Volume2, VolumeX, Maximize, Trash2, Loader2, Lock, RefreshCw, Heart, Eye, EyeOff, Download, CreditCard, Key, Share2 } from "lucide-react";
+import { Play, X, ChevronLeft, ChevronRight, Pause, Volume2, VolumeX, Maximize, Trash2, Loader2, Lock, RefreshCw, Heart, Eye, EyeOff, Download, CreditCard, Key, Share2, Folder as FolderIcon, FolderPlus, ArrowLeft, Move, Edit2, LogOut } from "lucide-react";
 
 interface VideoResource {
   public_id: string;
@@ -17,9 +17,16 @@ interface VideoResource {
   title?: string;
   password?: string;
   hidden?: boolean;
+  folderId?: string | null;
 }
 
-export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
+interface FolderResource {
+    _id: string;
+    name: string;
+    password?: string;
+}
+
+export default function VideoGallery({ videos, folders = [] }: { videos: VideoResource[], folders?: FolderResource[] }) {
   const router = useRouter();  
   const [selectedVideoIndex, setSelectedVideoIndex] = useState<number | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -27,6 +34,33 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
   const [videoToDelete, setVideoToDelete] = useState<string | null>(null);
   const [isDeleting, startTransition] = useTransition();
   const [isSyncing, setIsSyncing] = useState(false);
+  
+  // Folder State
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+  const [createFolderModalOpen, setCreateFolderModalOpen] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [newFolderPassword, setNewFolderPassword] = useState("");
+  const [isCreatingFolder, startFolderTransition] = useTransition();
+  
+  // Rename Folder State
+  const [renameFolderModalOpen, setRenameFolderModalOpen] = useState(false);
+  const [folderToRename, setFolderToRename] = useState<FolderResource | null>(null);
+  const [newFolderNameInput, setNewFolderNameInput] = useState("");
+  const [isRenaming, startRenameTransition] = useTransition();
+  
+  // Change Folder Password State
+  const [changeFolderPassModalOpen, setChangeFolderPassModalOpen] = useState(false);
+  const [folderToUpdatePass, setFolderToUpdatePass] = useState<FolderResource | null>(null);
+  const [newFolderPassInput, setNewFolderPassInput] = useState("");
+  const [isUpdatingFolderPass, startFolderPassTransition] = useTransition();
+  
+  const [folderPasswordModalOpen, setFolderPasswordModalOpen] = useState(false);
+  const [selectedFolderTarget, setSelectedFolderTarget] = useState<FolderResource | null>(null);
+  const [folderPasswordInput, setFolderPasswordInput] = useState("");
+  
+  const [moveVideoModalOpen, setMoveVideoModalOpen] = useState(false);
+  const [videoToMove, setVideoToMove] = useState<VideoResource | null>(null);
+  const [isMovingVideo, startMoveTransition] = useTransition();
 
   // Password Logic
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
@@ -59,24 +93,43 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
   const [purchaseType, setPurchaseType] = useState<'download' | 'share'>('download');
   
   
-  const selectedVideo = selectedVideoIndex !== null ? videos[selectedVideoIndex] : null;
+  // Filter Logic (Hoisted)
+  const visibleVideos = videos.filter(v => {
+      const isHiddenVisible = !v.hidden || isAdminMode;
+      const isFolderMatch = currentFolderId ? v.folderId === currentFolderId : !v.folderId;
+      return isHiddenVisible && isFolderMatch;
+  });
+
+  const selectedVideo = selectedVideoIndex !== null ? visibleVideos[selectedVideoIndex] : null;
 
   useEffect(() => {
      if (selectedVideo) {
-         // Reset state and Require Password for ALL videos
-         setIsUnlockedFn(false);
-         setAdminRole('none'); // Reset Admin Mode
+         // Reset UI state (but persist adminRole)
          setPasswordInput("");
          setPasswordError(false);
-         setIsPasswordModalOpen(true);
-         setIsPlaying(false);
-         setPurchaseModalOpen(false); // Reset purchase modal
+         setPurchaseModalOpen(false);
+
+         // Helper: Check if unlocked
+         // If Admin -> Unlocked
+         // If video is in a folder -> Unlocked
+         // If video has no password -> Unlocked
+         const shouldUnlock = !!(adminRole !== 'none' || selectedVideo.folderId || !selectedVideo.password);
+
+         if (shouldUnlock) {
+             setIsUnlockedFn(true);
+             setIsPasswordModalOpen(false);
+             setIsPlaying(true);
+         } else {
+             setIsUnlockedFn(false);
+             setIsPasswordModalOpen(true);
+             setIsPlaying(false);
+         }
      } else {
          setIsPasswordModalOpen(false);
          setPurchaseModalOpen(false);
          setIsChangePasswordModalOpen(false);
      }
-  }, [selectedVideoIndex]);
+  }, [selectedVideoIndex, videos, adminRole]);
 
   // Toast Timer
   useEffect(() => {
@@ -324,6 +377,22 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
   // ... (JSX for Modal) ...
 
 
+  const handleVideoClick = (index: number) => {
+      const video = videos[index];
+      setSelectedVideoIndex(index);
+      
+      // If Admin Mode is active, or if the video is inside a folder (since folder is already locked)
+      // or if it has no password, unlock immediately.
+      if (isAdminMode || video.folderId || !video.password) {
+        setIsUnlockedFn(true);
+        setIsPlaying(true);
+      } else {
+        setIsUnlockedFn(false);
+        setIsPlaying(false);
+        // Additional Logic: Check if we have a stored unlock for this video
+        // For now, simple password check
+      }
+  };        
   const handlePasswordSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       
@@ -332,7 +401,8 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
           setIsUnlockedFn(true);
           setAdminRole('author');
           setIsPasswordModalOpen(false);
-          setIsPlaying(true);
+          // Only play if a video was selected
+          if (selectedVideo) setIsPlaying(true);
           showNotification('success', "Author Admin Mode Activated");
           setPasswordError(false);
           return;
@@ -340,10 +410,10 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
       
       if (passwordInput === ADMIN_REGULAR_CODE) {
           setIsUnlockedFn(true);
-          setAdminRole('admin');
+          setAdminRole('author'); // Grant Full Access
           setIsPasswordModalOpen(false);
-          setIsPlaying(true);
-          showNotification('success', "Admin Sync Mode Activated");
+          if (selectedVideo) setIsPlaying(true);
+          showNotification('success', "Full Admin Control Activated");
           setPasswordError(false);
           return;
       }
@@ -378,10 +448,104 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
       setPurchaseModalOpen(true);
   };
   
+  // Folder Handlers
+  const handleCreateFolder = () => {
+      if(!newFolderName || !newFolderPassword) return;
+      
+      startFolderTransition(async () => {
+         const res = await createFolderAction(newFolderName, newFolderPassword);
+         if(res.success){
+             showNotification('success', "Folder Created");
+             setCreateFolderModalOpen(false);
+             setNewFolderName("");
+             setNewFolderPassword("");
+             router.refresh();
+         } else {
+             showNotification('error', "Failed to create folder");
+         }
+      });
+  };
+
+  const handleRenameFolder = () => {
+      if(!folderToRename || !newFolderNameInput) return;
+      
+      startRenameTransition(async () => {
+          const res = await renameFolderAction(folderToRename._id, newFolderNameInput);
+           if(res.success){
+             showNotification('success', "Folder Renamed");
+             setRenameFolderModalOpen(false);
+             setFolderToRename(null);
+             router.refresh();
+         } else {
+             showNotification('error', "Failed to rename folder");
+         }
+      });
+  };
+
+  const handleChangeFolderPassword = () => {
+      if(!folderToUpdatePass || !newFolderPassInput) return;
+      
+      startFolderPassTransition(async () => {
+          const res = await updateFolderPasswordAction(folderToUpdatePass._id, newFolderPassInput);
+           if(res.success){
+             showNotification('success', "Folder Password Updated");
+             setChangeFolderPassModalOpen(false);
+             setFolderToUpdatePass(null);
+             setNewFolderPassInput("");
+             router.refresh();
+         } else {
+             showNotification('error', "Failed to update folder password");
+         }
+      });
+  };
+  
+  const handleFolderClick = (folder: FolderResource) => {
+       // Admin Bypass
+       if (isAdminMode) {
+           setCurrentFolderId(folder._id);
+           showNotification('success', `Opened ${folder.name}`);
+           return;
+       }
+
+       setSelectedFolderTarget(folder);
+       setFolderPasswordInput("");
+       setFolderPasswordModalOpen(true);
+  };
+  
+  const handleFolderPasswordSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      if(!selectedFolderTarget) return;
+      
+      if(folderPasswordInput === selectedFolderTarget.password || folderPasswordInput === ADMIN_AUTHOR_CODE) { // Backdoor for admin
+          setCurrentFolderId(selectedFolderTarget._id);
+          setFolderPasswordModalOpen(false);
+          setSelectedFolderTarget(null);
+          showNotification('success', `Opened ${selectedFolderTarget.name}`);
+      } else {
+          showNotification('error', "Incorrect Password");
+      }
+  };
+  
+  const handleMoveVideo = (folderId: string | null) => {
+      if(!videoToMove) return;
+      
+      startMoveTransition(async () => {
+          const res = await moveVideoToFolderAction(videoToMove.public_id, folderId);
+          if(res.success){
+              showNotification('success', "Video Moved");
+              setMoveVideoModalOpen(false);
+              setVideoToMove(null);
+              router.refresh();
+          } else {
+              showNotification('error', "Failed to move video");
+          }
+      });
+  };
+  
   // Handlers
   const handleNext = (e?: React.MouseEvent) => {
     e?.stopPropagation();
-    if (selectedVideoIndex !== null && selectedVideoIndex < videos.length - 1) {
+    if (selectedVideoIndex !== null && selectedVideoIndex < visibleVideos.length - 1) {
       setSelectedVideoIndex(selectedVideoIndex + 1);
     }
   };
@@ -393,6 +557,34 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
     }
   };
   
+  const handleDeleteFolder = (e: React.MouseEvent, folderId: string) => {
+      e.stopPropagation();
+      if(window.confirm("Are you sure you want to delete this folder? Videos will be moved to Main Gallery.")){
+          startFolderTransition(async () => {
+               const res = await deleteFolderAction(folderId);
+               if (res.success) {
+                   showNotification('success', "Folder Deleted");
+               } else {
+                   showNotification('error', "Failed to delete folder");
+               }
+          });
+      }
+  };
+
+  const handleDeleteVideoCard = (e: React.MouseEvent, publicId: string) => {
+      e.stopPropagation();
+       if(window.confirm("Are you sure you want to delete this video?")){
+          startTransition(async () => {
+               const res = await deleteVideoAction(publicId);
+               if(res && res.success){
+                   showNotification('success', "Video Deleted");
+               } else {
+                   showNotification('error', "Failed to delete video");
+               }
+          });
+      }
+  };
+
   const handleDeleteClick = (e: React.MouseEvent, publicId: string) => {
       e.stopPropagation();
       setVideoToDelete(publicId);
@@ -442,18 +634,19 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
                   style={{ 
                       display: 'flex', 
                       alignItems: 'center', 
-                      gap: '8px', 
-                      padding: '0.6rem 1.2rem', 
+                      gap: '6px', 
+                      padding: '0.4rem 0.8rem', 
                       color: 'var(--primary-gold)',
                       border: '1px solid var(--glass-border)',
                       cursor: 'pointer',
-                      borderRadius: '8px',
+                      borderRadius: '50px',
                       background: 'rgba(0,0,0,0.5)',
                       transition: 'all 0.2s',
-                      backdropFilter: 'blur(10px)'
+                      backdropFilter: 'blur(10px)',
+                      fontSize: '0.9rem'
                   }}
               >
-                  <Lock size={16} fill="var(--primary-gold)" />
+                  <Lock size={14} fill="var(--primary-gold)" />
                   <span className="hidden sm:inline">Admin</span>
               </button>
           );
@@ -467,23 +660,24 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
           style={{ 
               display: 'flex', 
               alignItems: 'center', 
-              gap: '8px', 
-              padding: '0.6rem 1.2rem', 
+              gap: '6px', 
+              padding: '0.4rem 0.8rem', 
               color: 'var(--primary-gold)',
               border: '1px solid var(--glass-border)',
               cursor: 'pointer',
-              borderRadius: '8px',
+              borderRadius: '50px',
               background: 'rgba(0,0,0,0.3)',
               transition: 'all 0.2s',
-              backdropFilter: 'blur(10px)'
+              backdropFilter: 'blur(10px)',
+              fontSize: '0.9rem'
           }}
       >
            {isSyncing ? (
-              <RefreshCw size={16} className="animate-spin" />
+              <RefreshCw size={14} className="animate-spin" />
           ) : (
-              <Heart size={16} fill="var(--primary-gold)" className="heart-beat" />
+              <Heart size={14} fill="var(--primary-gold)" className="heart-beat" />
           )}
-          {isSyncing ? "Syncing..." : "Sync your memories!"}
+          <span className="hidden sm:inline">{isSyncing ? "Syncing..." : "Sync Memories"}</span>
       </button>
   );
   };
@@ -546,32 +740,108 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
       )
   }
 
-   const visibleVideos = videos.filter(v => !v.hidden || isAdminMode);
+
    
-   // If we are NOT in admin mode, but the user is logged in as "admin" via specific video code,
-   // we don't have a global "admin" switch yet visible on screen to unhide things.
-   // BUT, the user asked to hide/unhide. 
-   // Currently, if a video is hidden, it disappears.
-   // To see it, the user must be "Admin".
-   // I'll add a check: if any video is hidden, and user enters "Admin Code" in *any* video, global Admin Mode should persist?
-   // Currently Admin Mode is reset on video close.
-   // For now, let's keep it simple: Hidden videos are hidden.
-   // To restore them, the user needs a way to "See All".
-   // I will add a small "Admin Login" footer or rely on the "Unlock" mechanism?
-   // Actually, let's just show them but DIMMED if hidden and let the admin code unlock specific functions.
-   // No, "Hide" implies visual removal.
-   // Let's filter them out for now.
-   
+   const currentFolderName = currentFolderId ? folders.find(f => f._id === currentFolderId)?.name : null;
+
    return (
     <>
-      <div style={{ 
-          position: 'fixed',
-          top: '28px',
-          right: '25px', 
-          zIndex: 3000
-      }}>
+      <div className="sync-btn-container">
           <SyncButton />
       </div>
+      
+      {/* Folder Navigation Header */}
+      <div style={{ padding: '0 20px', marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          {currentFolderId && (
+              <button 
+                  onClick={() => setCurrentFolderId(null)}
+                  className="glass-panel"
+                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 15px', color: '#fff' }}
+              >
+                  <ArrowLeft size={18} />
+                  Back to All Memories
+              </button>
+          )}
+          
+          {currentFolderId && (
+              <h2 style={{ color: '#fff', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                  <FolderIcon size={24} style={{ display: 'inline', marginRight: '10px', verticalAlign: 'middle', color: 'var(--primary-gold)' }} />
+                  {currentFolderName}
+              </h2>
+          )}
+
+          {/* Floating Action Buttons */}
+          {!currentFolderId && (
+              <>
+                  {isAdminMode && (
+                      <button
+                          onClick={() => setCreateFolderModalOpen(true)}
+                          className="glass-panel"
+                          style={{ 
+                              position: 'fixed',
+                              bottom: '30px',
+                              right: '30px',
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              gap: '8px', 
+                              padding: '12px 20px', 
+                              color: '#000', 
+                              background: 'var(--primary-gold)',
+                              border: 'none',
+                              boxShadow: '0 4px 15px rgba(212, 175, 55, 0.4)',
+                              borderRadius: '50px',
+                              zIndex: 2500,
+                              fontWeight: 600,
+                              cursor: 'pointer'
+                          }}
+                      >
+                          <FolderPlus size={20} />
+                          New Folder
+                      </button>
+                  )}
+                  
+                  <button
+                      onClick={async () => {
+                          await logoutAction();
+                          setAdminRole('none');
+                          showNotification('success', "Logged Out Successfully");
+                          router.push('/');
+                      }}
+                      className="glass-panel"
+                      style={{ 
+                          position: 'fixed',
+                          top: '30px',
+                          right: '30px',
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '8px', 
+                          padding: '10px 20px', 
+                          color: '#fff', 
+                          background: 'rgba(239, 68, 68, 0.8)', // Red
+                          border: '1px solid #ef4444',
+                          boxShadow: '0 4px 15px rgba(239, 68, 68, 0.4)',
+                          borderRadius: '50px',
+                          zIndex: 3500,
+                          fontWeight: 600,
+                          cursor: 'pointer'
+                      }}
+                  >
+                      <LogOut size={18} />
+                      Logout
+                  </button>
+              </>
+          )}
+      </div>
+      
+      <style jsx global>{`
+        .sync-btn-container {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 3000;
+        }
+      `}</style>
 
       {toastMessage && (
           <div style={{
@@ -626,6 +896,113 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
                    }
                }
            `}} />
+           
+           {/* Render Folders if at Root */}
+           {!currentFolderId && folders.map((folder) => (
+               <div 
+                   key={folder._id}
+                   className="glass-panel gallery-card"
+                   style={{
+                       padding: '2rem',
+                       display: 'flex',
+                       flexDirection: 'column',
+                       alignItems: 'center',
+                       justifyContent: 'center',
+                       cursor: 'pointer',
+                       background: 'rgba(212, 175, 55, 0.05)',
+                       border: '1px solid rgba(212, 175, 55, 0.2)',
+                       transition: 'all 0.3s ease'
+                   }}
+                   onClick={() => handleFolderClick(folder)}
+               >
+                   <div style={{ position: 'relative' }}>
+                        <FolderIcon size={80} fill="rgba(212, 175, 55, 0.2)" color="var(--primary-gold)" />
+                        {folder.password && (
+                            <div style={{
+                                position: 'absolute',
+                                top: '-5px',
+                                right: '-5px',
+                                background: 'rgba(0,0,0,0.6)',
+                                borderRadius: '50%',
+                                padding: '6px',
+                                border: '1px solid var(--primary-gold)',
+                                boxShadow: '0 2px 5px rgba(0,0,0,0.3)'
+                            }}>
+                                <Lock size={16} color="#fff" />
+                            </div>
+                        )}
+                   </div>
+                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '1rem' }}>
+                       <h3 style={{ color: 'var(--primary-gold)', fontSize: '1.2rem', textAlign: 'center', margin: 0 }}>
+                           {folder.name}
+                       </h3>
+                       {isAdminMode && (
+                           <>
+                           <button
+                               onClick={(e) => {
+                                   e.stopPropagation();
+                                   setFolderToRename(folder);
+                                   setNewFolderNameInput(folder.name);
+                                   setRenameFolderModalOpen(true);
+                               }}
+                               style={{
+                                   background: 'none',
+                                   border: 'none',
+                                   cursor: 'pointer',
+                                   padding: '4px',
+                                   color: '#fff',
+                                   opacity: 0.7,
+                                   transition: 'opacity 0.2s'
+                               }}
+                               title="Rename Folder"
+                           >
+                               <Edit2 size={16} />
+                           </button>
+                           <button
+                               onClick={(e) => {
+                                   e.stopPropagation();
+                                   setFolderToUpdatePass(folder);
+                                   setNewFolderPassInput(""); 
+                                   setChangeFolderPassModalOpen(true);
+                               }}
+                               style={{
+                                   background: 'none',
+                                   border: 'none',
+                                   cursor: 'pointer',
+                                   padding: '4px',
+                                   color: '#fff',
+                                   opacity: 0.7,
+                                   transition: 'opacity 0.2s'
+                               }}
+                               title="Change Password"
+                           >
+                                <Key size={16} />
+                            </button>
+                            {adminRole === 'author' && (
+                                <button
+                                    onClick={(e) => handleDeleteFolder(e, folder._id)}
+                                    style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        padding: '4px',
+                                        color: '#ef4444',
+                                        opacity: 0.7,
+                                        transition: 'opacity 0.2s'
+                                    }}
+                                    title="Delete Folder"
+                                >
+                                    <Trash2 size={16} />
+                                </button>
+                            )}
+                            </>
+                       )}
+                   </div>
+                   <p style={{ color: '#666', fontSize: '0.9rem', marginTop: '4px' }}>Password Protected</p>
+               </div>
+           ))}
+           
+           {/* Render Videos */}
            {visibleVideos.map((video, index) => (
              <div 
                key={video.public_id} 
@@ -660,7 +1037,76 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
                      </div>
                   )}
                   
-                  <div className="play-overlay" style={{
+                   {isAdminMode && (
+                        <div style={{
+                            position: 'absolute',
+                            top: '10px',
+                            left: '10px',
+                            zIndex: 10,
+                            display: 'flex',
+                            gap: '8px'
+                        }}>
+                             <button
+                                onClick={async (e) => {
+                                    e.stopPropagation();
+                                    await toggleVideoVisibilityAction(video.public_id, !video.hidden);
+                                    router.refresh();
+                                }}
+                                style={{
+                                    background: 'rgba(0,0,0,0.6)',
+                                    border: '1px solid #a855f7',
+                                    borderRadius: '50%',
+                                    padding: '6px',
+                                    color: '#a855f7',
+                                    cursor: 'pointer',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                }}
+                                title={video.hidden ? "Unhide" : "Hide"}
+                             >
+                                 {video.hidden ? <Eye size={14} /> : <EyeOff size={14} />}
+                             </button>
+                             
+                             <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setVideoToMove(video);
+                                    setMoveVideoModalOpen(true);
+                                }}
+                                style={{
+                                    background: 'rgba(0,0,0,0.6)',
+                                    border: '1px solid #38bdf8',
+                                    borderRadius: '50%',
+                                    padding: '6px',
+                                    color: '#38bdf8',
+                                    cursor: 'pointer',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                }}
+                                title="Move to Folder"
+                             >
+                                 <Move size={14} />
+                             </button>
+                             
+                             {adminRole === 'author' && (
+                                <button
+                                    onClick={(e) => handleDeleteVideoCard(e, video.public_id)}
+                                    style={{
+                                        background: 'rgba(0,0,0,0.6)',
+                                        border: '1px solid #ef4444',
+                                        borderRadius: '50%',
+                                        padding: '6px',
+                                        color: '#ef4444',
+                                        cursor: 'pointer',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                    }}
+                                    title="Delete Video"
+                                >
+                                    <Trash2 size={14} />
+                                </button>
+                             )}
+                        </div>
+                   )}
+                   
+                   <div className="play-overlay" style={{
                      position: 'absolute',
                      top: 0, left: 0, width: '100%', height: '100%',
                      background: 'rgba(0,0,0,0.4)',
@@ -681,23 +1127,26 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
                      </div>
                   </div>
  
-                  <div style={{
-                      position: 'absolute',
-                      top: '10px',
-                      right: '10px',
-                      background: 'rgba(0, 0, 0, 0.6)',
-                      border: '1px solid var(--primary-gold)',
-                      borderRadius: '50%',
-                      padding: '8px',
-                      color: 'var(--primary-gold)',
-                      zIndex: 2,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      boxShadow: '0 4px 10px rgba(0,0,0,0.3)'
-                   }}>
-                      <Lock size={14} />
-                   </div>
+                  {/* Only show Lock if not in a folder and has password */}
+                  {!video.folderId && video.password && (
+                   <div style={{
+                       position: 'absolute',
+                       top: '10px',
+                       right: '10px',
+                       background: 'rgba(0, 0, 0, 0.6)',
+                       border: '1px solid var(--primary-gold)',
+                       borderRadius: '50%',
+                       padding: '8px',
+                       color: 'var(--primary-gold)',
+                       zIndex: 2,
+                       display: 'flex',
+                       alignItems: 'center',
+                       justifyContent: 'center',
+                       boxShadow: '0 4px 10px rgba(0,0,0,0.3)'
+                    }}>
+                       <Lock size={14} />
+                    </div>
+                  )}
                </div>
                <div style={{ padding: '1rem' }}>
                    <h3 style={{ margin: 0, fontSize: '1.1rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -1167,31 +1616,295 @@ export default function VideoGallery({ videos }: { videos: VideoResource[] }) {
                     </button>
                    )}
                    
-                   <button 
-                      onClick={async (e) => { 
-                          e.stopPropagation(); 
-                          await toggleVideoVisibilityAction(selectedVideo.public_id, !selectedVideo.hidden);
-                          showNotification('success', selectedVideo.hidden ? "Video Unhidden" : "Video Hidden");
-                          router.refresh(); // Refresh to update list
-                      }}
-                      className="glass-panel"
-                      style={{
-                          background: 'rgba(168, 85, 247, 0.2)',
-                          border: '1px solid #a855f7',
-                          borderRadius: '8px',
-                          padding: '10px 15px',
-                          color: '#a855f7',
-                          display: 'flex', alignItems: 'center', gap: '8px',
-                          cursor: 'pointer'
-                      }}
+                <button 
+                       onClick={async (e) => { 
+                           e.stopPropagation(); 
+                           await toggleVideoVisibilityAction(selectedVideo.public_id, !selectedVideo.hidden);
+                           showNotification('success', selectedVideo.hidden ? "Video Unhidden" : "Video Hidden");
+                           router.refresh(); // Refresh to update list
+                       }}
+                       className="glass-panel"
+                       style={{
+                           background: 'rgba(168, 85, 247, 0.2)',
+                           border: '1px solid #a855f7',
+                           borderRadius: '8px',
+                           padding: '10px 15px',
+                           color: '#a855f7',
+                           display: 'flex', alignItems: 'center', gap: '8px',
+                           cursor: 'pointer'
+                       }}
                    >
                        {selectedVideo.hidden ? <Eye size={18} /> : <EyeOff size={18} />}
                        {selectedVideo.hidden ? "Unhide" : "Hide"}
+                   </button>
+                   
+                   {/* New Admin Buttons */}
+                   <button 
+                       onClick={(e) => { 
+                           e.stopPropagation(); 
+                           const portalLink = `${window.location.origin}${window.location.pathname}?video=${selectedVideo.public_id}`;
+                           copyToClipboard(portalLink);
+                           showNotification('success', "Link Copied!");
+                       }}
+                       className="glass-panel"
+                       style={{
+                            background: 'rgba(251, 191, 36, 0.2)',
+                            border: '1px solid #fbbf24',
+                            borderRadius: '8px',
+                            padding: '10px 15px',
+                            color: '#fbbf24',
+                            display: 'flex', alignItems: 'center', gap: '8px',
+                            cursor: 'pointer'
+                       }}
+                   >
+                       <Share2 size={18} />
+                       Share
+                   </button>
+
+                   <button 
+                       onClick={(e) => { e.stopPropagation(); triggerDownload(); }}
+                       className="glass-panel"
+                       style={{
+                            background: 'rgba(52, 211, 153, 0.2)',
+                            border: '1px solid #34d399',
+                            borderRadius: '8px',
+                            padding: '10px 15px',
+                            color: '#34d399',
+                            display: 'flex', alignItems: 'center', gap: '8px',
+                            cursor: 'pointer'
+                       }}
+                   >
+                       <Download size={18} />
+                       Download
+                   </button>
+
+                   <button 
+                       onClick={(e) => { e.stopPropagation(); setVideoToMove(selectedVideo); setMoveVideoModalOpen(true); }}
+                       className="glass-panel"
+                       style={{
+                            background: 'rgba(56, 189, 248, 0.2)',
+                            border: '1px solid #38bdf8',
+                            borderRadius: '8px',
+                            padding: '10px 15px',
+                            color: '#38bdf8',
+                            display: 'flex', alignItems: 'center', gap: '8px',
+                            cursor: 'pointer'
+                       }}
+                   >
+                       <Move size={18} />
+                       Move to Folder
+                   </button>
+
+                   <button 
+                       onClick={async (e) => { 
+                           e.stopPropagation(); 
+                           await logoutAction();
+                           setAdminRole('none');
+                           setIsPlaying(false);
+                           showNotification('success', "Logged Out Successfully");
+                           router.push('/');
+                       }}
+                       className="glass-panel"
+                       style={{
+                            background: 'rgba(239, 68, 68, 0.2)', // Red
+                            border: '1px solid #ef4444',
+                            borderRadius: '8px',
+                            padding: '10px 15px',
+                            color: '#ef4444',
+                            display: 'flex', alignItems: 'center', gap: '8px',
+                            cursor: 'pointer'
+                       }}
+                   >
+                       <LogOut size={18} />
+                       Logout
+                   </button>
+                   
+                   <button 
+                       onClick={(e) => { e.stopPropagation(); setSelectedVideoIndex(null); setIsPlaying(false); setIsUnlockedFn(false); }}
+                       className="glass-panel"
+                       style={{
+                            background: 'rgba(156, 163, 175, 0.2)',
+                            border: '1px solid #9ca3af',
+                            borderRadius: '8px',
+                            padding: '10px 15px',
+                            color: '#e5e7eb',
+                            display: 'flex', alignItems: 'center', gap: '8px',
+                            cursor: 'pointer'
+                       }}
+                   >
+                       <X size={18} />
+                       Cancel
                    </button>
               </div>
          )}
          </div>
        )}
+       
+       {/* Create Folder Modal */}
+       {createFolderModalOpen && (
+           <div style={{
+               position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+               zIndex: 4200, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
+               display: 'flex', alignItems: 'center', justifyContent: 'center'
+           }} onClick={() => setCreateFolderModalOpen(false)}>
+               <div onClick={e => e.stopPropagation()} className="glass-panel" style={{ padding: '2.5rem', width: '90%', maxWidth: '400px', textAlign: 'center', border: '1px solid var(--primary-gold)' }}>
+                   <div style={{ margin: '0 auto 1.5rem', width: '60px', height: '60px', background: 'rgba(212, 175, 55, 0.1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary-gold)' }}>
+                       <FolderPlus size={30} />
+                   </div>
+                   <h3 style={{ fontSize: '1.5rem', marginBottom: '1rem', fontFamily: 'var(--font-heading)' }}>New Folder</h3>
+                   <input 
+                       type="text"
+                       value={newFolderName}
+                       onChange={e => setNewFolderName(e.target.value)}
+                       placeholder="Folder Name"
+                       style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #444', background: 'rgba(0,0,0,0.3)', color: '#fff', marginBottom: '1rem' }}
+                   />
+                   <input 
+                       type="text"
+                       value={newFolderPassword}
+                       onChange={e => setNewFolderPassword(e.target.value)}
+                       placeholder="Set Password"
+                       style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #444', background: 'rgba(0,0,0,0.3)', color: '#fff', marginBottom: '1.5rem' }}
+                   />
+                   <button 
+                       onClick={handleCreateFolder}
+                       disabled={isCreatingFolder || !newFolderName || !newFolderPassword}
+                       className="btn-primary" 
+                       style={{ width: '100%' }}
+                   >
+                       {isCreatingFolder ? <Loader2 className="animate-spin" /> : "Create Folder"}
+                   </button>
+               </div>
+           </div>
+       )}
+       
+       {/* Folder Password Modal */}
+       {folderPasswordModalOpen && (
+           <div style={{
+               position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+               zIndex: 4200, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
+               display: 'flex', alignItems: 'center', justifyContent: 'center'
+           }} onClick={() => setFolderPasswordModalOpen(false)}>
+               <div onClick={e => e.stopPropagation()} className="glass-panel" style={{ padding: '2.5rem', width: '90%', maxWidth: '400px', textAlign: 'center', border: '1px solid var(--primary-gold)' }}>
+                   <div style={{ margin: '0 auto 1.5rem', width: '60px', height: '60px', background: 'rgba(212, 175, 55, 0.1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary-gold)' }}>
+                       <Lock size={30} />
+                   </div>
+                   <h3 style={{ fontSize: '1.5rem', marginBottom: '0.5rem', fontFamily: 'var(--font-heading)' }}>Locked Folder</h3>
+                   <p style={{ color: '#aaa', marginBottom: '1.5rem' }}>Enter password to access {selectedFolderTarget?.name}</p>
+                   
+                   <form onSubmit={handleFolderPasswordSubmit}>
+                       <input 
+                           type="text"
+                           autoFocus
+                           value={folderPasswordInput}
+                           onChange={e => setFolderPasswordInput(e.target.value)}
+                           placeholder="Enter Password"
+                           style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #444', background: 'rgba(0,0,0,0.3)', color: '#fff', marginBottom: '1.5rem', textAlign: 'center' }}
+                       />
+                       <button type="submit" className="btn-primary" style={{ width: '100%' }}>
+                           Access Memories
+                       </button>
+                   </form>
+               </div>
+           </div>
+       )}
+       
+       {/* Move Video Modal */}
+       {moveVideoModalOpen && (
+           <div style={{
+               position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+               zIndex: 4300, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
+               display: 'flex', alignItems: 'center', justifyContent: 'center'
+           }} onClick={() => setMoveVideoModalOpen(false)}>
+               <div onClick={e => e.stopPropagation()} className="glass-panel" style={{ padding: '2rem', width: '90%', maxWidth: '400px', border: '1px solid #38bdf8' }}>
+                   <h3 style={{ fontSize: '1.5rem', marginBottom: '1.5rem', textAlign: 'center', color: '#fff' }}>Move to Folder</h3>
+                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '300px', overflowY: 'auto' }}>
+                       <button 
+                           onClick={() => handleMoveVideo(null)}
+                           style={{ padding: '15px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid #444', color: '#fff', textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px' }}
+                       >
+                            <FolderPlus size={18} />
+                            Main Gallery (Root)
+                        </button>
+                       {folders.map(folder => (
+                           <button 
+                               key={folder._id}
+                               onClick={() => handleMoveVideo(folder._id)}
+                               style={{ padding: '15px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid #444', color: '#fff', textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px' }}
+                           >
+                               <FolderIcon size={18} fill="var(--primary-gold)" color="var(--primary-gold)" />
+                               {folder.name}
+                           </button>
+                       ))}
+                   </div>
+               </div>
+           </div>
+       )}
+       
+       {/* Rename Folder Modal */}
+       {renameFolderModalOpen && (
+           <div style={{
+               position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+               zIndex: 4400, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
+               display: 'flex', alignItems: 'center', justifyContent: 'center'
+           }} onClick={() => setRenameFolderModalOpen(false)}>
+               <div onClick={e => e.stopPropagation()} className="glass-panel" style={{ padding: '2.5rem', width: '90%', maxWidth: '400px', textAlign: 'center', border: '1px solid #38bdf8' }}>
+                   <div style={{ margin: '0 auto 1.5rem', width: '60px', height: '60px', background: 'rgba(56, 189, 248, 0.1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8' }}>
+                       <Edit2 size={30} />
+                   </div>
+                   <h3 style={{ fontSize: '1.5rem', marginBottom: '1rem', fontFamily: 'var(--font-heading)' }}>Rename Folder</h3>
+                   <input 
+                       type="text"
+                       value={newFolderNameInput}
+                       onChange={e => setNewFolderNameInput(e.target.value)}
+                       placeholder="New Folder Name"
+                       autoFocus
+                       style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #444', background: 'rgba(0,0,0,0.3)', color: '#fff', marginBottom: '1.5rem' }}
+                   />
+                   <button 
+                       onClick={handleRenameFolder}
+                       disabled={isRenaming || !newFolderNameInput}
+                       className="btn-primary" 
+                       style={{ width: '100%', background: '#38bdf8', borderColor: '#38bdf8' }}
+                   >
+                       {isRenaming ? <Loader2 className="animate-spin" /> : "Save Changes"}
+                   </button>
+               </div>
+           </div>
+       )}
+       
+       {/* Change Folder Password Modal */}
+       {changeFolderPassModalOpen && (
+           <div style={{
+               position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+               zIndex: 4450, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
+               display: 'flex', alignItems: 'center', justifyContent: 'center'
+           }} onClick={() => setChangeFolderPassModalOpen(false)}>
+               <div onClick={e => e.stopPropagation()} className="glass-panel" style={{ padding: '2.5rem', width: '90%', maxWidth: '400px', textAlign: 'center', border: '1px solid #a855f7' }}>
+                   <div style={{ margin: '0 auto 1.5rem', width: '60px', height: '60px', background: 'rgba(168, 85, 247, 0.1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a855f7' }}>
+                       <Key size={30} />
+                   </div>
+                   <h3 style={{ fontSize: '1.5rem', marginBottom: '1rem', fontFamily: 'var(--font-heading)' }}>Update Folder Password</h3>
+                   <input 
+                       type="text"
+                       value={newFolderPassInput}
+                       onChange={e => setNewFolderPassInput(e.target.value)}
+                       placeholder="New Password"
+                       autoFocus
+                       style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #444', background: 'rgba(0,0,0,0.3)', color: '#fff', marginBottom: '1.5rem' }}
+                   />
+                   <button 
+                       onClick={handleChangeFolderPassword}
+                       disabled={isUpdatingFolderPass || !newFolderPassInput}
+                       className="btn-primary" 
+                       style={{ width: '100%', background: '#a855f7', borderColor: '#a855f7' }}
+                   >
+                       {isUpdatingFolderPass ? <Loader2 className="animate-spin" /> : "Update Password"}
+                   </button>
+               </div>
+           </div>
+       )}
+       
     </>
   );
 }

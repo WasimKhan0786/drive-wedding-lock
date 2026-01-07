@@ -34,6 +34,11 @@ const VideoSchema = new Schema({
     type: Date,
     default: Date.now,
   },
+  folderId: {
+    type: Schema.Types.ObjectId,
+    ref: 'Folder',
+    default: null,
+  },
 });
 
 // Prevent model recompilation error in development

@@ -32,7 +32,7 @@ export default function LoginScreen() {
                     <Lock size={32} color="#D4AF37" />
                 </div>
                 
-                <h1 className="title">Welcome Back</h1>
+                <h1 className="title"><span className="animated-logo-text">Welcome Back</span></h1>
                 <p className="subtitle">Please enter your credentials to access the memory portal.</p>
 
                 <form onSubmit={handleSubmit} className="form">
