@@ -1420,29 +1420,34 @@ export default function VideoGallery({ videos, folders = [] }: { videos: VideoRe
                           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
                           style={{ pointerEvents: 'auto' }}
                       ></iframe>
-                      {/* Blocker to hide Share/Title/Watch Later from YouTube Player */}
-                      <div style={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          width: '100%',
-                          height: '25%', // Increased to cover typical mobile UI top bar
-                          minHeight: '80px',
-                          zIndex: 10,
-                          background: 'transparent', 
-                          // debug: 'rgba(255,0,0,0.2)' 
-                      }} />
-                      
-                      {/* Extra blocker for top-right "Watch Later" / "Share" specifically */}
-                      <div style={{
-                          position: 'absolute',
-                          top: 0,
-                          right: 0,
-                          width: '30%', // Cover the right side more aggressively
-                          height: '35%',
-                          zIndex: 11,
-                          background: 'transparent'
-                      }} />
+                      {/* Compliance: Security Blockers to prevent unauthorized sharing */}
+                      {!isAdminMode && (
+                        <>
+                            {/* Top Bar Blocker (Title & Share protection) */}
+                            <div style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                width: '100%',
+                                height: '60px', 
+                                zIndex: 10,
+                                background: 'transparent',
+                                pointerEvents: 'auto' 
+                            }} />
+                            
+                            {/* Extra right-side protection for 'Watch Later' & 'Share' buttons specifically */}
+                            <div style={{
+                                position: 'absolute',
+                                top: 0,
+                                right: 0,
+                                width: '120px', 
+                                height: '60px',
+                                zIndex: 11,
+                                background: 'transparent',
+                                pointerEvents: 'auto'
+                            }} />
+                        </>
+                      )}
                        
                        {/* Custom Fullscreen Button */}
                        <div style={{
