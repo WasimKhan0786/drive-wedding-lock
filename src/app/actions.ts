@@ -73,6 +73,8 @@ export async function updateVideoPasswordAction(publicId: string, newPassword: s
        
        await connectToDatabase();
        
+       console.log(`[Action] Updating video password for ID: ${publicId}`);
+       
        const result = await Video.findOneAndUpdate(
            { $or: [{ videoId: publicId }, { id: publicId }, { public_id: publicId }] },
            { $set: { password: newPassword } },
@@ -186,11 +188,24 @@ export async function renameFolderAction(folderId: string, newName: string) {
 
 export async function updateFolderPasswordAction(folderId: string, newPassword: string) {
     try {
+        console.log(`[Action] Updating folder password for ID: ${folderId}`);
         const { default: connectToDatabase } = await import("@/lib/db");
         const { default: Folder } = await import("@/models/Folder");
         await connectToDatabase();
         
-        await Folder.findByIdAndUpdate(folderId, { password: newPassword });
+        // Find folder first to ensure it exists
+        const folder = await Folder.findById(folderId);
+        if (!folder) {
+            console.error(`[Action] Folder not found: ${folderId}`);
+            return { success: false, error: "Folder not found" };
+        }
+
+        // Update password properly
+        folder.password = newPassword;
+        await folder.save();
+        
+        console.log(`[Action] Successfully updated password for folder: ${folder.name}`);
+
         revalidatePath("/gallery");
         return { success: true };
     } catch (error) {

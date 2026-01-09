@@ -12,20 +12,14 @@ export default async function GalleryPage() {
   const cookieStore = await cookies();
   const isAdmin = cookieStore.get("auth_token")?.value === "unlocked";
   let videos: any[] = [];
+  let folders: any[] = [];
 
   try {
       await connectToDatabase();
-      
-      // If admin, show all. If not, show only visible.
-      // Actually, standard users shouldn't see hidden.
-      // But ADMIN needs to login via standard page to see them?
-      // Wait, the "7004636112" feature is client-side only per session.
-      // So fetch EVERYTHING, but let Client Component filter?
-      // No, that leaks hidden videos to client source.
-      // BUT, since we have a client-side admin mode switch, we MUST send them to client.
-      // We will rely on the CLIENT component to visually hide them unless admin mode is active.
+      const { default: Folder } = await import("@/models/Folder"); // Import Folder model
       
       videos = await Video.find({}).sort({ createdAt: -1 }).lean();
+      folders = await Folder.find({}).sort({ createdAt: -1 }).lean();
   } catch (e) {
       console.error("Failed to fetch videos from DB", e);
   }
@@ -38,8 +32,15 @@ export default async function GalleryPage() {
       title: v.title,
       password: v.password,
       hidden: v.hidden || false,
+      folderId: v.folderId ? v.folderId.toString() : null,
       width: 1920,
       height: 1080 
+  }));
+
+  const formattedFolders = folders.map((f: any) => ({
+      _id: f._id.toString(),
+      name: f.name,
+      password: f.password
   }));
 
   return (
@@ -60,7 +61,7 @@ export default async function GalleryPage() {
         </div>
         
         {/* Pass the data to the Client Component */}
-        <VideoGallery videos={formattedVideos} />
+        <VideoGallery videos={formattedVideos} folders={formattedFolders} />
       </div>
     </main>
   );
