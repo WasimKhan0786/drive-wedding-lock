@@ -1446,6 +1446,18 @@ export default function VideoGallery({ videos, folders = [] }: { videos: VideoRe
                                 background: 'transparent',
                                 pointerEvents: 'auto'
                             }} />
+
+                            {/* Bottom Right Blocker (YouTube Logo protection) */}
+                            <div style={{
+                                position: 'absolute',
+                                bottom: 0,
+                                right: 0,
+                                width: '170px', 
+                                height: '60px',
+                                zIndex: 11,
+                                background: 'transparent',
+                                pointerEvents: 'auto'
+                            }} />
                         </>
                       )}
                        
